@@ -1,0 +1,46 @@
+{
+  "name": "project-factory",
+  "version": "1.0.0",
+  "description": "Autonomous software development system",
+  "main": "dist/main.js",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc",
+    "start": "node dist/main.js",
+    "test": "vitest",
+    "lint": "eslint src --ext .ts",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "db:generate": "drizzle-kit generate"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "autonomous",
+    "code-generation"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@langchain/core": "^0.3.40",
+    "@langchain/langgraph": "^0.2.50",
+    "@langchain/openai": "^0.4.4",
+    "@types/ws": "^8.18.1",
+    "better-sqlite3": "^11.8.1",
+    "drizzle-orm": "^0.40.0",
+    "express": "^4.21.2",
+    "ws": "^8.20.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.13.4",
+    "drizzle-kit": "^0.30.4",
+    "eslint": "^9.21.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.7"
+  }
+}
