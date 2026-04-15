@@ -132,6 +132,24 @@ export const api = {
     return response.data!;
   },
 
+  async generateIdeas(topic: string, count: number = 3): Promise<{ ideas: Idea[]; count: number }> {
+    const response = await fetchApi<{ ideas: Idea[]; count: number }>('/ideas/generate', {
+      method: 'POST',
+      body: JSON.stringify({ topic, count }),
+    });
+    if (response.error) throw new Error(response.error);
+    return response.data!;
+  },
+
+  async developIdea(id: string): Promise<{ success: boolean; projectId?: string; error?: string }> {
+    const response = await fetchApi<{ success: boolean; projectId?: string; error?: string }>(
+      `/ideas/${id}/develop`,
+      { method: 'POST' }
+    );
+    if (response.error) throw new Error(response.error);
+    return response.data!;
+  },
+
   async queueIdea(id: string): Promise<{ idea: Idea }> {
     const response = await fetchApi<{ idea: Idea }>(`/ideas/${id}/queue`, {
       method: 'POST',

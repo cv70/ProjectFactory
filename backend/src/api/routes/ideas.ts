@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { ideaRepository } from '../../domain/idea/persistence.js';
 import type { CreateIdeaInput } from '../../domain/idea/schema.js';
 import { createLogger } from '../../utils/logger.js';
+import { generateIdeasFromTopic } from '../../agents/idea-generator/idea-generator.js';
+import { orchestrator } from '../../orchestration/simple-orchestrator.js';
 
 const logger = createLogger('IdeasAPI');
 const router = Router();
@@ -110,6 +112,61 @@ router.post('/:id/queue', async (req, res) => {
   } catch (error) {
     logger.error('Failed to queue idea', error);
     res.status(500).json({ error: 'Failed to queue idea' });
+  }
+});
+
+/**
+ * POST /api/ideas/generate - Generate ideas from a theme/topic
+ */
+router.post('/generate', async (req, res) => {
+  try {
+    const { topic, count = 3 } = req.body;
+
+    if (!topic || typeof topic !== 'string' || topic.trim().length === 0) {
+      res.status(400).json({ error: 'Topic is required' });
+      return;
+    }
+
+    logger.info('Generating ideas from topic', { topic, count });
+    const ideas = await generateIdeasFromTopic(topic.trim(), count);
+
+    res.status(201).json({ ideas, count: ideas.length });
+  } catch (error) {
+    logger.error('Failed to generate ideas', error);
+    res.status(500).json({ error: 'Failed to generate ideas' });
+  }
+});
+
+/**
+ * POST /api/ideas/:id/develop - Manually start project development from an idea
+ */
+router.post('/:id/develop', async (req, res) => {
+  try {
+    const idea = await ideaRepository.findById(req.params.id);
+
+    if (!idea) {
+      res.status(404).json({ error: 'Idea not found' });
+      return;
+    }
+
+    if (idea.status !== 'pending' && idea.status !== 'queued') {
+      res.status(400).json({ error: `Cannot develop idea with status: ${idea.status}` });
+      return;
+    }
+
+    logger.info('Manually starting project development', { ideaId: idea.id, title: idea.title });
+
+    // Run development synchronously for manual trigger
+    const result = await orchestrator.pickAndDevelopIdeaForIdea(idea.id);
+
+    if (result.success) {
+      res.json({ success: true, projectId: result.projectId, message: 'Project development started' });
+    } else {
+      res.status(500).json({ success: false, error: result.error });
+    }
+  } catch (error) {
+    logger.error('Failed to start project development', error);
+    res.status(500).json({ error: 'Failed to start project development' });
   }
 });
 

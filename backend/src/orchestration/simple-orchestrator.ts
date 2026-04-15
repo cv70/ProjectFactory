@@ -75,43 +75,68 @@ export class SimpleOrchestrator {
         return { success: false, error: 'No queued ideas' };
       }
 
-      logger.info('Picked idea for development', { ideaId: idea.id, title: idea.title });
-
-      // Update idea status
-      await ideaRepository.updateStatus(idea.id, 'in_progress');
-
-      // Create project
-      const projectPath = `${config.workspace.activeDir}/${idea.id}`;
-      await filesystem.ensureDir(projectPath);
-
-      const project = await projectRepository.create({
-        ideaId: idea.id,
-        name: idea.title,
-        description: idea.description,
-        type: idea.projectType as any,
-        path: projectPath,
-        status: 'initializing',
-      });
-
-      logger.info('Created project', { projectId: project.id, path: projectPath });
-
-      // Run development workflow
-      const workflowResult = await this.runDevelopmentWorkflow(project.id, idea, projectPath);
-
-      if (workflowResult.success) {
-        await projectRepository.markCompleted(project.id);
-        await ideaRepository.updateStatus(idea.id, 'completed');
-        logger.info('Project completed successfully', { projectId: project.id });
-        return { success: true, projectId: project.id };
-      } else {
-        await projectRepository.markFailed(project.id, workflowResult.error);
-        await ideaRepository.updateStatus(idea.id, 'failed', workflowResult.error);
-        logger.error('Project failed', { projectId: project.id, error: workflowResult.error });
-        return { success: false, error: workflowResult.error, projectId: project.id };
-      }
+      return await this.developIdea(idea);
     } catch (error) {
       logger.error('Failed to pick and develop idea', error);
       return { success: false, error: (error as Error).message };
+    }
+  }
+
+  /**
+   * Develop a specific idea by ID (for manual trigger)
+   */
+  async pickAndDevelopIdeaForIdea(ideaId: string): Promise<{ success: boolean; projectId?: string; error?: string }> {
+    try {
+      const idea = await ideaRepository.findById(ideaId);
+      if (!idea) {
+        logger.debug('Idea not found', { ideaId });
+        return { success: false, error: 'Idea not found' };
+      }
+
+      return await this.developIdea(idea);
+    } catch (error) {
+      logger.error('Failed to develop idea', error);
+      return { success: false, error: (error as Error).message };
+    }
+  }
+
+  /**
+   * Internal method to develop an idea
+   */
+  private async developIdea(idea: any): Promise<{ success: boolean; projectId?: string; error?: string }> {
+    logger.info('Picked idea for development', { ideaId: idea.id, title: idea.title });
+
+    // Update idea status
+    await ideaRepository.updateStatus(idea.id, 'in_progress');
+
+    // Create project
+    const projectPath = `${config.workspace.activeDir}/${idea.id}`;
+    await filesystem.ensureDir(projectPath);
+
+    const project = await projectRepository.create({
+      ideaId: idea.id,
+      name: idea.title,
+      description: idea.description,
+      type: idea.projectType as any,
+      path: projectPath,
+      status: 'initializing',
+    });
+
+    logger.info('Created project', { projectId: project.id, path: projectPath });
+
+    // Run development workflow
+    const workflowResult = await this.runDevelopmentWorkflow(project.id, idea, projectPath);
+
+    if (workflowResult.success) {
+      await projectRepository.markCompleted(project.id);
+      await ideaRepository.updateStatus(idea.id, 'completed');
+      logger.info('Project completed successfully', { projectId: project.id });
+      return { success: true, projectId: project.id };
+    } else {
+      await projectRepository.markFailed(project.id, workflowResult.error);
+      await ideaRepository.updateStatus(idea.id, 'failed', workflowResult.error);
+      logger.error('Project failed', { projectId: project.id, error: workflowResult.error });
+      return { success: false, error: workflowResult.error, projectId: project.id };
     }
   }
 

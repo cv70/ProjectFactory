@@ -5,6 +5,7 @@ import { prompts } from '../../utils/prompts.js';
 import { ideaRepository } from '../../domain/idea/persistence.js';
 import { createLogger } from '../../utils/logger.js';
 import { llmClientFactory } from '../../infra/llm-client.js';
+import type { Idea } from '../../domain/idea/schema.js';
 
 const logger = createLogger('IdeaGeneratorAgent');
 
@@ -100,20 +101,36 @@ export class IdeaGeneratorAgent extends BaseAgent {
    * Build prompt based on current mode and task
    */
   protected buildPrompt(task: AgentTask, _context: ExecutionContext): string {
-    const { batchSize = 3 } = (task.input as Record<string, unknown>) || {};
+    const { batchSize = 3, topic } = (task.input as Record<string, unknown>) || {};
+    const plan = task.input?.plan || task.metadata?.plan || '';
 
     switch (this.mode) {
       case 'planner':
+        if (topic) {
+          return prompts.ideaGeneration.plannerWithTopic
+            .replace('{topic}', String(topic))
+            .replace('{batchSize}', String(batchSize));
+        }
         return prompts.ideaGeneration.planner.replace('{batchSize}', String(batchSize));
 
       case 'executor':
-        const plan = task.input?.plan || task.metadata?.plan || '';
+        if (topic) {
+          return prompts.ideaGeneration.executorWithTopic
+            .replace('{topic}', String(topic))
+            .replace('{batchSize}', String(batchSize))
+            .replace('{plan}', String(plan));
+        }
         return prompts.ideaGeneration.executor
           .replace('{batchSize}', String(batchSize))
           .replace('{plan}', String(plan));
 
       case 'critic':
         const ideas = task.input?.ideas || [];
+        if (topic) {
+          return prompts.ideaGeneration.criticWithTopic
+            .replace('{topic}', String(topic))
+            .replace('{ideas}', JSON.stringify(ideas, null, 2));
+        }
         return prompts.ideaGeneration.critic.replace('{ideas}', JSON.stringify(ideas, null, 2));
 
       default:
@@ -314,4 +331,111 @@ export async function generateIdeas(batchSize: number = 3): Promise<{
     plan: planResult.data as any,
     critique,
   };
+}
+
+/**
+ * Generate ideas from a specific topic/theme
+ * Uses the 4-step flow: Research -> Brainstorming -> Evaluation -> Refinement
+ */
+export async function generateIdeasFromTopic(topic: string, batchSize: number = 3): Promise<Idea[]> {
+  const plannerAgent = new IdeaGeneratorAgent({ mode: 'planner' });
+  const executorAgent = new IdeaGeneratorAgent({ mode: 'executor' });
+  const criticAgent = new IdeaGeneratorAgent({ mode: 'critic' });
+
+  // Step 1: Planner creates topic-focused strategy
+  const planResult = await plannerAgent.execute(
+    {
+      type: 'idea-generation',
+      priority: 5,
+      description: `Generate idea plan for topic: ${topic}`,
+      input: { batchSize, topic },
+    },
+    {
+      executionId: `ig_topic_${Date.now()}`,
+      stage: 'idea-generation',
+      iterationCount: 0,
+      maxIterations: 1,
+      metadata: { topic },
+      startedAt: Date.now(),
+      previousResults: new Map(),
+    }
+  );
+
+  if (!planResult.success) {
+    throw new Error('Planning failed: ' + planResult.error);
+  }
+
+  // Step 2: Executor generates topic-focused ideas
+  const executorResult = await executorAgent.execute(
+    {
+      type: 'idea-generation',
+      priority: 5,
+      description: `Generate ideas for topic: ${topic}`,
+      input: { batchSize, plan: planResult.data, topic },
+    },
+    {
+      executionId: `ig_topic_${Date.now()}`,
+      stage: 'idea-generation',
+      iterationCount: 0,
+      maxIterations: 1,
+      metadata: { plan: planResult.data, topic },
+      startedAt: Date.now(),
+      previousResults: new Map(),
+    }
+  );
+
+  if (!executorResult.success) {
+    throw new Error('Idea execution failed: ' + executorResult.error);
+  }
+
+  // Step 3: Critic evaluates ideas
+  const criticResult = await criticAgent.execute(
+    {
+      type: 'idea-generation',
+      priority: 5,
+      description: 'Evaluate generated ideas',
+      input: { ideas: executorResult.data, topic },
+    },
+    {
+      executionId: `ig_topic_${Date.now()}`,
+      stage: 'idea-generation',
+      iterationCount: 0,
+      maxIterations: 1,
+      metadata: { topic },
+      startedAt: Date.now(),
+      previousResults: new Map(),
+    }
+  );
+
+  if (!criticResult.success) {
+    throw new Error('Critique failed: ' + criticResult.error);
+  }
+
+  // Filter ideas based on critic feedback
+  const allIdeas = executorResult.data as any;
+  const critique = criticResult.data as any;
+  const approvedIdeas = allIdeas.filter((idea: any, idx: number) => {
+    const eval_ = critique.evaluations?.[idx];
+    return !eval_ || eval_.action !== 'reject';
+  });
+
+  // Step 4: Save approved ideas to database
+  const savedIdeas: Idea[] = [];
+  for (const idea of approvedIdeas) {
+    const saved = await ideaRepository.create({
+      title: idea.title,
+      description: idea.description,
+      projectType: idea.projectType,
+      features: idea.features,
+      techStack: idea.techStack,
+      targetAudience: idea.targetAudience,
+      complexity: idea.complexity,
+      status: 'pending',
+      metadata: { topic, generatedAt: Date.now() },
+    });
+    savedIdeas.push(saved);
+  }
+
+  logger.info('Generated ideas from topic', { topic, count: savedIdeas.length });
+  return savedIdeas;
 }

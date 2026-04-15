@@ -97,6 +97,7 @@ graph TD
 | 模块 | 职责 | 技术栈 |
 |------|------|--------|
 | Dashboard | 主控制面板，展示系统状态 | React + Recharts |
+| IdeaList | 项目想法管理（生成/添加/开发） | React + Framer Motion |
 | ProjectList | 项目列表管理 | React + TanStack Query |
 | ProjectDetail | 项目详情，实时进度 | React + WebSocket |
 | CodeEditor | 代码预览与编辑 | Monaco Editor |
@@ -110,6 +111,7 @@ graph TD
 | 模块 | 职责 | 技术栈 |
 |------|------|--------|
 | API Server | HTTP API服务 | Express/Fastify |
+| IdeaGeneratorAgent | 基于主题自动生成Idea | LangChain.js + LLM |
 | Agent Orchestrator | Agent调度与编排 | 自定义框架 |
 | LangChain Service | LLM交互抽象层 | LangChain.js |
 | Project Manager | 项目生命周期管理 | 自定义 |
@@ -120,7 +122,34 @@ graph TD
 | Monitoring Service | 监控与告警 | Prometheus+AlertManager |
 | Event Bus | 事件驱动通信 | Redis/内存 |
 
-### 2.3 数据模块
+### 2.3 Idea 管理模块
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                      Idea 管理流程                                    │
+└─────────────────────────────────────────────────────────────────────┘
+
+用户输入主题 ──→ IdeaGeneratorAgent ──→ Planner ──→ Executor ──→ Critic
+                        │                               │
+                        ↓                               ↓
+                   保存到数据库                    评估筛选
+                        │                               │
+                        ↓                               ↓
+                   Idea 列表 ◀─────────────────────── Approved Ideas
+                        │
+            ┌───────────┼───────────┐
+            ↓           ↓           ↓
+        手动添加    主题生成     查看详情
+            │           │           │
+            └───────────┴─────┬─────┘
+                              ↓
+                        Start Development
+                              │
+                              ↓
+                    Orchestrator 触发项目开发
+```
+
+### 2.4 数据模块
 
 | 存储 | 用途 | 数据类型 |
 |------|------|---------|
@@ -316,6 +345,7 @@ interface TaskQueue {
 
 ---
 
-**版本**: 0.1.0
-**更新日期**: 2026-04-14
+**版本**: 0.2.0
+**更新日期**: 2026-04-15
 **状态**: 设计阶段
+**变更**: 新增 Idea 管理模块，支持主题自动生成、手动添加、手动触发开发

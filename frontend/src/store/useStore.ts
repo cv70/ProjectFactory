@@ -13,16 +13,28 @@ interface AppState {
   selectedIdeaId: string | null;
   selectedProjectId: string | null;
 
+  // Language & Theme
+  language: 'zh' | 'en';
+  theme: 'light' | 'dark';
+
+  // Tab Navigation
+  activeTab: 'home' | 'ideas' | 'projects';
+
   // Actions
   fetchIdeas: () => Promise<void>;
   fetchProjects: () => Promise<void>;
   fetchStatus: () => Promise<void>;
-  queueIdea: (id: string) => Promise<void>;
+  createIdea: (input: Partial<Idea>) => Promise<void>;
+  generateIdeas: (topic: string, count?: number) => Promise<void>;
+  developIdea: (id: string) => Promise<{ success: boolean; projectId?: string; error?: string }>;
   deleteIdea: (id: string) => Promise<void>;
   setSelectedIdea: (id: string | null) => void;
   setSelectedProject: (id: string | null) => void;
   setError: (error: string | null) => void;
   clearError: () => void;
+  setLanguage: (language: 'zh' | 'en') => void;
+  setTheme: (theme: 'light' | 'dark') => void;
+  setActiveTab: (tab: 'home' | 'ideas' | 'projects') => void;
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -34,6 +46,9 @@ export const useStore = create<AppState>((set, get) => ({
   error: null,
   selectedIdeaId: null,
   selectedProjectId: null,
+  language: 'zh',
+  theme: 'dark',
+  activeTab: 'home',
 
   // Actions
   fetchIdeas: async () => {
@@ -65,13 +80,37 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
-  queueIdea: async (id: string) => {
+  createIdea: async (input: Partial<Idea>) => {
     set({ loading: true, error: null });
     try {
-      await api.queueIdea(id);
+      await api.createIdea(input);
       await get().fetchIdeas();
     } catch (error) {
       set({ error: (error as Error).message, loading: false });
+    }
+  },
+
+  generateIdeas: async (topic: string, count: number = 3) => {
+    set({ loading: true, error: null });
+    try {
+      await api.generateIdeas(topic, count);
+      await get().fetchIdeas();
+    } catch (error) {
+      set({ error: (error as Error).message, loading: false });
+    }
+  },
+
+  developIdea: async (id: string) => {
+    set({ loading: true, error: null });
+    try {
+      const result = await api.developIdea(id);
+      await get().fetchIdeas();
+      await get().fetchProjects();
+      set({ loading: false });
+      return result;
+    } catch (error) {
+      set({ error: (error as Error).message, loading: false });
+      return { success: false, error: (error as Error).message };
     }
   },
 
@@ -99,5 +138,20 @@ export const useStore = create<AppState>((set, get) => ({
 
   clearError: () => {
     set({ error: null });
+  },
+
+  setLanguage: (language: 'zh' | 'en') => {
+    set({ language });
+    localStorage.setItem('language', language);
+  },
+
+  setTheme: (theme: 'light' | 'dark') => {
+    set({ theme });
+    localStorage.setItem('theme', theme);
+    document.documentElement.setAttribute('data-theme', theme);
+  },
+
+  setActiveTab: (tab: 'home' | 'ideas' | 'projects') => {
+    set({ activeTab: tab });
   },
 }));

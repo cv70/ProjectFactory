@@ -6,7 +6,7 @@
 
 | 原则 | 描述 | 示例 |
 |------|------|------|
-| 资源命名 | 使用名词复数 | `/projects`, `/users` |
+| 资源命名 | 使用名词复数 | `/projects`, `/ideas` |
 | HTTP方法 | 语义化使用方法 | GET读取, POST创建, PUT更新, DELETE删除 |
 | 状态码 | 正确使用状态码 | 200成功, 201创建, 400错误请求, 404未找到 |
 | 版本控制 | URL版本控制 | `/api/v1/projects` |
@@ -48,9 +48,241 @@
 }
 ```
 
-## 2. 项目API
+## 2. Ideas API
 
-### 2.1 获取项目列表
+### 2.1 获取想法列表
+
+```
+GET /api/ideas
+```
+
+**Query Parameters**
+
+| 参数 | 类型 | 必填 | 描述 |
+|------|------|------|------|
+| status | string | 否 | 状态筛选：pending, queued, in_progress, completed, failed |
+| limit | integer | 否 | 返回数量限制 |
+| offset | integer | 否 | 偏移量 |
+
+**Response**
+
+```json
+{
+  "ideas": [
+    {
+      "id": "idea_abc123",
+      "title": "AI Task Manager",
+      "description": "An intelligent task manager powered by AI",
+      "projectType": "web-app",
+      "features": ["AI task prioritization", "Natural language input", "Smart scheduling"],
+      "techStack": ["React", "Node.js", "OpenAI"],
+      "targetAudience": "Productivity enthusiasts",
+      "complexity": "medium",
+      "status": "pending",
+      "createdAt": 1712000000000,
+      "metadata": {
+        "topic": "AI助手",
+        "generatedAt": 1712000000000
+      }
+    }
+  ]
+}
+```
+
+### 2.2 基于主题生成想法（自动）
+
+```
+POST /api/ideas/generate
+```
+
+**Request Body**
+
+```json
+{
+  "topic": "AI助手",
+  "count": 3
+}
+```
+
+| 参数 | 类型 | 必填 | 描述 |
+|------|------|------|------|
+| topic | string | 是 | 主题关键词 |
+| count | integer | 否 | 生成数量，默认3 |
+
+**Response**
+
+```json
+{
+  "ideas": [
+    {
+      "id": "idea_abc123",
+      "title": "AI Task Manager",
+      "description": "An intelligent task manager...",
+      "projectType": "web-app",
+      "features": ["..."],
+      "techStack": ["..."],
+      "targetAudience": "...",
+      "complexity": "medium",
+      "status": "pending",
+      "createdAt": 1712000000000
+    }
+  ],
+  "count": 3
+}
+```
+
+### 2.3 手动添加想法
+
+```
+POST /api/ideas
+```
+
+**Request Body**
+
+```json
+{
+  "title": "My Custom Idea",
+  "description": "A custom project idea I want to develop",
+  "projectType": "web-app",
+  "features": ["Feature 1", "Feature 2"],
+  "techStack": ["React", "TypeScript"],
+  "targetAudience": "Developers",
+  "complexity": "low"
+}
+```
+
+**Response**
+
+```json
+{
+  "idea": {
+    "id": "idea_xyz789",
+    "title": "My Custom Idea",
+    "description": "A custom project idea...",
+    "projectType": "web-app",
+    "features": ["Feature 1", "Feature 2"],
+    "techStack": ["React", "TypeScript"],
+    "targetAudience": "Developers",
+    "complexity": "low",
+    "status": "pending",
+    "createdAt": 1712000000000
+  }
+}
+```
+
+### 2.4 开始项目开发（手动触发）
+
+```
+POST /api/ideas/:id/develop
+```
+
+**Response**
+
+```json
+{
+  "success": true,
+  "projectId": "proj_abc123",
+  "message": "Project development started"
+}
+```
+
+**错误响应**
+
+```json
+{
+  "success": false,
+  "error": "Cannot develop idea with status: completed"
+}
+```
+
+### 2.5 获取单个想法
+
+```
+GET /api/ideas/:id
+```
+
+**Response**
+
+```json
+{
+  "idea": {
+    "id": "idea_abc123",
+    "title": "AI Task Manager",
+    "description": "An intelligent task manager...",
+    "projectType": "web-app",
+    "features": ["..."],
+    "techStack": ["..."],
+    "targetAudience": "...",
+    "complexity": "medium",
+    "status": "pending",
+    "createdAt": 1712000000000
+  }
+}
+```
+
+### 2.6 获取队列中的想法
+
+```
+GET /api/ideas/queued
+```
+
+**Query Parameters**
+
+| 参数 | 类型 | 必填 | 描述 |
+|------|------|------|------|
+| limit | integer | 否 | 返回数量限制 |
+
+**Response**
+
+```json
+{
+  "ideas": [
+    {
+      "id": "idea_abc123",
+      "title": "AI Task Manager",
+      "status": "queued",
+      "queuePosition": 1
+    }
+  ]
+}
+```
+
+### 2.7 删除想法
+
+```
+DELETE /api/ideas/:id
+```
+
+**Response**
+
+```
+204 No Content
+```
+
+### 2.8 获取想法统计
+
+```
+GET /api/ideas/stats
+```
+
+**Response**
+
+```json
+{
+  "stats": {
+    "pending": 5,
+    "queued": 2,
+    "in_progress": 1,
+    "completed": 10,
+    "failed": 1
+  },
+  "total": 19
+}
+```
+
+## 3. 项目API
+
+### 3.1 获取项目列表
 
 ```
 GET /api/v1/projects
@@ -101,7 +333,7 @@ GET /api/v1/projects
 }
 ```
 
-### 2.2 获取项目详情
+### 3.2 获取项目详情
 
 ```
 GET /api/v1/projects/:id
@@ -152,7 +384,7 @@ GET /api/v1/projects/:id
 }
 ```
 
-### 2.3 创建项目
+### 3.3 创建项目
 
 ```
 POST /api/v1/projects
@@ -186,7 +418,7 @@ POST /api/v1/projects
 }
 ```
 
-### 2.4 启动项目生成
+### 3.4 启动项目生成
 
 ```
 POST /api/v1/projects/:id/start
@@ -206,7 +438,7 @@ POST /api/v1/projects/:id/start
 }
 ```
 
-### 2.5 停止项目生成
+### 3.5 停止项目生成
 
 ```
 POST /api/v1/projects/:id/stop
@@ -225,7 +457,7 @@ POST /api/v1/projects/:id/stop
 }
 ```
 
-### 2.6 删除项目
+### 3.6 删除项目
 
 ```
 DELETE /api/v1/projects/:id
@@ -240,7 +472,7 @@ DELETE /api/v1/projects/:id
 }
 ```
 
-### 2.7 获取项目代码
+### 3.7 获取项目代码
 
 ```
 GET /api/v1/projects/:id/code
@@ -292,7 +524,7 @@ GET /api/v1/projects/:id/code
 }
 ```
 
-### 2.8 获取项目日志
+### 3.8 获取项目日志
 
 ```
 GET /api/v1/projects/:id/logs
@@ -334,9 +566,9 @@ GET /api/v1/projects/:id/logs
 }
 ```
 
-## 3. 生成API
+## 4. 生成API
 
-### 3.1 获取模板列表
+### 4.1 获取模板列表
 
 ```
 GET /api/v1/generation/templates
@@ -368,7 +600,7 @@ GET /api/v1/generation/templates
 }
 ```
 
-### 3.2 预览生成
+### 4.2 预览生成
 
 ```
 POST /api/v1/generation/preview
@@ -407,9 +639,9 @@ POST /api/v1/generation/preview
 }
 ```
 
-## 4. 知识库API
+## 5. 知识库API
 
-### 4.1 搜索知识
+### 5.1 搜索知识
 
 ```
 GET /api/v1/knowledge/search
@@ -444,7 +676,7 @@ GET /api/v1/knowledge/search
 }
 ```
 
-### 4.2 获取知识详情
+### 5.2 获取知识详情
 
 ```
 GET /api/v1/knowledge/:id
@@ -468,9 +700,9 @@ GET /api/v1/knowledge/:id
 }
 ```
 
-## 5. 监控API
+## 6. 监控API
 
-### 5.1 获取系统指标
+### 6.1 获取系统指标
 
 ```
 GET /api/v1/monitoring/metrics
@@ -511,7 +743,7 @@ GET /api/v1/monitoring/metrics
 }
 ```
 
-### 5.2 获取实时日志
+### 6.2 获取实时日志
 
 ```
 GET /api/v1/monitoring/logs/stream
@@ -536,7 +768,7 @@ WebSocket连接，实时推送日志消息。
 }
 ```
 
-### 5.3 获取告警列表
+### 6.3 获取告警列表
 
 ```
 GET /api/v1/monitoring/alerts
@@ -570,9 +802,9 @@ GET /api/v1/monitoring/alerts
 }
 ```
 
-## 6. WebSocket事件
+## 7. WebSocket事件
 
-### 6.1 项目进度事件
+### 7.1 项目进度事件
 
 **Channel**: `/api/v1/projects/:id/events`
 
@@ -603,7 +835,7 @@ GET /api/v1/monitoring/alerts
 }
 ```
 
-### 6.2 系统监控事件
+### 7.2 系统监控事件
 
 **Channel**: `/api/v1/monitoring/realtime`
 
@@ -615,7 +847,7 @@ GET /api/v1/monitoring/alerts
 | `alert.triggered` | 告警触发 | `{ alert }` |
 | `alert.resolved` | 告警解决 | `{ alertId }` |
 
-## 7. 错误码
+## 8. 错误码
 
 | 错误码 | HTTP状态 | 描述 |
 |--------|---------|------|
@@ -635,6 +867,7 @@ GET /api/v1/monitoring/alerts
 
 ---
 
-**版本**: 0.1.0
-**更新日期**: 2026-04-14
+**版本**: 0.2.0
+**更新日期**: 2026-04-15
 **状态**: 设计阶段
+**变更**: 新增 Ideas API，包括主题生成(POST /ideas/generate)、手动创建(POST /ideas)、手动开发触发(POST /ideas/:id/develop)
